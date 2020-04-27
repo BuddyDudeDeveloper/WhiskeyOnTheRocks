@@ -1,3 +1,4 @@
+/// Includes all the necessary header files.
 #include <ri.h>
 #include <RixInterfaces.h>
 #include <RiTypesHelper.h>
@@ -6,7 +7,6 @@
 #include <string.h>
 #include <string>
 #include <vector>
-//#include "getFiles.h"
 
 // A RiProcedural must implement these functions. This is a fixed requirement.
 extern "C"
@@ -16,8 +16,17 @@ extern "C"
 	PRMANEXPORT RtVoid    Free              ( RtPointer data                 );
 }
 
+/**
+* This struct is defined by the data passed through from the data field of the RenderMan procedural node.
+* 
+* RtFloat size_variance: The variation in the scale of the ice cube.
+* RtFloat spacing_variance: The variation in the x and z coordinates of the ice cube.
+* std::string ice_path: The absolute path to the ice RIB archive.
+* RtFloat initial_scale: The default scale of each ice cube.
+* RtInt coordinate_count: The number of coordinates an ice cube can be placed at.
+* RtFloat *surface_coordinates: The x, y, z coorindates of the top of the whiskey.
+*/
 typedef struct {
-
 	RtFloat size_variance;
 	RtFloat spacing_variance;
 	RtFloat rotation_variance;
@@ -33,6 +42,13 @@ std::vector<std::string> winGetFiles(std::string pattern);
 std::vector<std::string> globGetFiles(const std::string& pattern);
 std::vector<std::string> getFiles(std::string pattern);
 
+/**
+* Converts the data to their proper data types.
+* 
+* RtString paramStr: The string of the data from the RenderMan procedural node's data attribute.
+*
+* Returns a pointer to the data for the ice.
+*/
 RtPointer ConvertParameters(RtString paramStr) {
 	// The strtok() function cannot be used on the paramStr directly because
 	// it modifies the string. 
@@ -92,13 +108,16 @@ RtPointer ConvertParameters(RtString paramStr) {
 // ----------------------------------------------------
 RtVoid Subdivide(RtPointer data, RtFloat detail) {
 	
-    RtFloat size_variance = ((IceData*)data)->size_variance;
- 	RtFloat spacing_variance = ((IceData*)data)->spacing_variance;
+	/// Each value is pulled from the pointer to the instance of the IceData struct.
+	RtFloat size_variance = ((IceData*)data)->size_variance;
+	RtFloat spacing_variance = ((IceData*)data)->spacing_variance;
 	RtFloat rotation_variance = ((IceData*)data)->rotation_variance;
 	std::string ice_path = ((IceData*)data)->ice_path;
 	RtInt coordinate_count = ((IceData*)data)->coordinate_count;
 	RtFloat initial_scale = ((IceData*)data)->initial_scale;
 	RtFloat *surface_coordinates =  ((IceData*)data)->surface_coordinates;
+	
+	/// This keeps track of the coordinates that already have ice cubes placed there.
 	std::vector <RtFloat> other_coordinates;
 
 	for(int current_index = 0; current_index < coordinate_count; current_index += 3) {
@@ -107,7 +126,7 @@ RtVoid Subdivide(RtPointer data, RtFloat detail) {
 			RtFloat y = surface_coordinates[current_index + 1];
 			RtFloat z = surface_coordinates[current_index + 2] + randBetween(-spacing_variance, spacing_variance);
 			
-			
+			/// Loops until there is a confirmed overlap of ice cubes.
 			RtBoolean overlaps_another = false;
 			for(int current_other_index = 0; current_other_index < other_coordinates.size(); current_other_index += 3) {
 				if(overlaps_another) {
@@ -119,9 +138,9 @@ RtVoid Subdivide(RtPointer data, RtFloat detail) {
 				overlaps_another = isOverlapping(x, y, z, other_x, other_y, other_z);
 			} 
 			
+			/// If there are no ice cubes at all or there was no overlap, create and place the ice cube as well as keep track of the coordinate where it was placed.
 			if(other_coordinates.size() == 0 || !overlaps_another) {
 					
-					printf("x: %f\n", x);
 					RiTransformBegin();
 					RiTranslate(x,y,z);
 					RiRotate(randBetween(-rotation_variance, rotation_variance), randBetween(0, 1), randBetween(0, 1), randBetween(0, 1));
@@ -140,6 +159,7 @@ RtVoid Subdivide(RtPointer data, RtFloat detail) {
 			
 	}
 }
+
 // ----------------------------------------------------
 // A RiProcedural required function
 // ----------------------------------------------------
@@ -147,7 +167,27 @@ RtVoid Free(RtPointer data) {
 	free(((IceData*)data)->surface_coordinates);
     free(data);
 }
-	
+
+/**
+* Picks a random number between 2 values. Provided by Malcolm Kesson.
+*
+* RtFloat min: The smaller number in the range.
+* RtFloat max: The larger number in the range.
+*
+* Returns a random number betwen the min and max.
+*/
+RtFloat randBetween(RtFloat min, RtFloat max) {
+    return ((RtFloat)rand()/RAND_MAX) * (max - min) + min;
+}
+
+/**
+* Checks if the ice cube about to placed would overlap with one that is already placed.
+*
+* RtFloat x, y, z: The coordinates of the ice cube being placed.
+* RtFloat other_x, other_y, other_z: The coordinates of the ice cube that is already placed.
+*
+* Returns whether or not the ice cubes are overlapping.
+*/
 RtBoolean isOverlapping(RtFloat x, RtFloat y, RtFloat z, RtFloat other_x, RtFloat other_y, RtFloat other_z) {
 	
 	RtFloat distance_to_edge = .25;
@@ -175,10 +215,7 @@ RtBoolean isOverlapping(RtFloat x, RtFloat y, RtFloat z, RtFloat other_x, RtFloa
 	return xOverlaps && yOverlaps && zOverlaps;
 }
 
-RtFloat randBetween(RtFloat min, RtFloat max) {
-    return ((RtFloat)rand()/RAND_MAX) * (max - min) + min;
-}
-
+/// THE FOLLOWING CODE WAS PROVIDED BY MALCOLM KESSON TO GET THE RIB ARCHIVE FILE
 #ifdef  _WIN32
 	#include <Windows.h>
 	std::vector<std::string> winGetFiles(std::string pattern) {
